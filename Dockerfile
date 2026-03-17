@@ -34,41 +34,28 @@ RUN npm prune --production
 # 阶段 2: 运行阶段 (Runner)
 # ==========================================
 FROM node:20-alpine AS runner
-
-# 设置工作目录
 WORKDIR /app
 
-# 1. 安装运行时必需的系统库
-# Prisma 在 Alpine 下需要 openssl
-# procps 是为了让 PM2 能获取进程信息 (可选，但推荐)
 RUN apk add --no-cache openssl procps tzdata
-
-# 2. 设置时区 (可选，建议设置为上海时间，方便看日志)
 ENV TZ="Asia/Shanghai"
-
-# 3. 全局安装 pm2
 RUN npm install -g pm2
 
-# 4. 创建非 root 用户 (处于安全考虑)
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S midway -u 1001
 
-# 5. 准备日志目录并设置权限
-RUN mkdir -p /app/logs && \
-    chown -R midway:nodejs /app/logs
+# --- 重点修改 1：同时准备 logs 和 uploads 目录并授权 ---
+RUN mkdir -p /app/logs /app/uploads && \
+    chown -R midway:nodejs /app/logs /app/uploads
 
-# 6. 拷贝构建产物 (使用 --chown 避免在层中重复复制文件)
-# 只拷贝 dist, node_modules, bootstrap.js, package.json
 COPY --from=builder --chown=midway:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=midway:nodejs /app/dist ./dist
 COPY --from=builder --chown=midway:nodejs /app/package.json ./
 COPY --from=builder --chown=midway:nodejs /app/prisma ./prisma
-# 如果你的入口文件是 bootstrap.js，需要拷贝它
 COPY --from=builder --chown=midway:nodejs /app/bootstrap.js ./
 
-# 7. 生成 ecosystem.config.json
-# 建议：最好将此文件直接写在项目中，然后 COPY 进来，这样更容易维护
-# 这里保留你的写法，但简化了路径引用
+# --- 重点修改 2：把启动逻辑写成一个命令组合 ---
+# 在启动 PM2 之前，先执行数据库同步。使用 sh -c 来串联命令。
+# 注意：USER midway 依然保留，确保是以非 root 身份执行同步
 RUN echo '{\
   "apps": [{\
     "name": "water-meter-api",\
@@ -89,18 +76,10 @@ RUN echo '{\
   }]\
 }' > /app/ecosystem.config.json && chown midway:nodejs /app/ecosystem.config.json
 
-# 8. 切换用户
 USER midway
-
-# 暴露端口
 EXPOSE 7001
-
-# 环境变量
 ENV NODE_ENV=production
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:7001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
-
-# 启动命令
-CMD ["pm2-runtime", "start", "/app/ecosystem.config.json"]
+# --- 重点修改 3：自动化 Prisma 同步 ---
+# 只有当数据库就绪时，这行才会成功执行（配合 compose 的 healthcheck）
+CMD ["sh", "-c", "npx prisma generate && npx prisma db push && pm2-runtime start /app/ecosystem.config.json"]

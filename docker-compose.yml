@@ -48,8 +48,8 @@ services:
     ports:
       - "${API_PORT:-7001}:7001"
     volumes:
-      - ./uploads:/app/uploads
-      - ./logs:/app/logs
+      - api_uploads:/app/uploads
+      - api_logs:/app/logs
     networks:
       - water-meter-network
     depends_on:
@@ -59,6 +59,8 @@ services:
 volumes:
   postgres_data:
     driver: local
+  api_uploads: # 让 Docker 自动管理权限
+  api_logs:    # 让 Docker 自动管理权限
 
 networks:
   water-meter-network:
