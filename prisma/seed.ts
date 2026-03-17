@@ -209,7 +209,9 @@ async function main() {
   console.log(`报修工单: 3个 (1个待处理, 1个处理中, 1个已完成)`);
   console.log('\n=== 登录信息 ===');
   console.log('Web后台管理员登录: 用户名: 系统管理员, 密码: admin123');
-  console.log('居民用户OpenID: resident_openid_001, resident_openid_002, resident_openid_003');
+  console.log(
+    '居民用户OpenID: resident_openid_001, resident_openid_002, resident_openid_003'
+  );
 }
 
 main()

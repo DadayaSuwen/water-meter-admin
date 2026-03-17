@@ -1,6 +1,12 @@
 import { Provide, Inject } from '@midwayjs/core';
 import { PrismaService } from '../prisma.service';
-import { BindingStatus, MeterStatus, Prisma, MeterType, ValveStatus } from '@prisma/client';
+import {
+  BindingStatus,
+  MeterStatus,
+  Prisma,
+  MeterType,
+  ValveStatus,
+} from '@prisma/client';
 
 export interface CreateBindingDTO {
   serialNumber: string;
@@ -353,7 +359,9 @@ export class MeterService {
   /**
    * 将后端 MeterStatus 转换为前端 status 格式
    */
-  private mapStatusToFrontend(status: MeterStatus): 'online' | 'offline' | 'error' {
+  private mapStatusToFrontend(
+    status: MeterStatus
+  ): 'online' | 'offline' | 'error' {
     switch (status) {
       case MeterStatus.NORMAL:
         return 'online';
@@ -387,7 +395,9 @@ export class MeterService {
   /**
    * 将后端 ValveStatus 转换为前端 valveStatus 格式
    */
-  private mapValveStatusToFrontend(status: ValveStatus): 'open' | 'closed' | 'error' {
+  private mapValveStatusToFrontend(
+    status: ValveStatus
+  ): 'open' | 'closed' | 'error' {
     switch (status) {
       case ValveStatus.OPEN:
         return 'open';
@@ -429,9 +439,11 @@ export class MeterService {
       const ownerName = approvedBinding?.user?.username || '未绑定';
 
       // 格式化最后通讯时间
-      const updateTime = meter.lastCommunicationAt 
+      const updateTime = meter.lastCommunicationAt
         ? this.formatDateTime(meter.lastCommunicationAt)
-        : (meter.createdAt ? this.formatDateTime(meter.createdAt) : '-');
+        : meter.createdAt
+        ? this.formatDateTime(meter.createdAt)
+        : '-';
 
       return {
         id: meter.id,

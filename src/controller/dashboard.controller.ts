@@ -103,12 +103,12 @@ export class DashboardController {
    * 获取月度用水趋势数据
    */
   @Get('/consumption-trend', { middleware: [JwtMiddleware, AdminMiddleware] })
-  async getConsumptionTrend(@Query('months') months: number = 6) {
+  async getConsumptionTrend(@Query('months') months = 6) {
     try {
       // 获取最近 N 个月的用水记录
       const usageRecords = await this.prisma.usageRecord.findMany({
         orderBy: { period: 'desc' },
-        take: months,
+        take: Number(months),
       });
 
       // 按月份汇总

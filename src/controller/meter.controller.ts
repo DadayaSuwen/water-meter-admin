@@ -420,4 +420,132 @@ export class MeterController {
       };
     }
   }
+
+  /**
+   * 模拟：实时抄表
+   * 请求路径: POST /api/meter/:meterId/read
+   */
+  @Post('/:meterId/read', { middleware: [JwtMiddleware, AdminMiddleware] })
+  async readMeterRealtime() {
+    try {
+      const meterId = this.ctx.params.meterId;
+
+      if (!meterId) {
+        return {
+          success: false,
+          message: '水表ID不能为空',
+        };
+      }
+
+      // 1. 查询当前水表
+      const meter = await this.prisma.waterMeter.findUnique({
+        where: { id: meterId },
+      });
+
+      if (!meter) {
+        return {
+          success: false,
+          message: '找不到该水表设备',
+        };
+      }
+
+      // 2. 模拟物联网 NB-IoT 通信延迟 (1 ~ 2.5秒随机延时)
+      const delay = Math.floor(Math.random() * 1500) + 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // 3. 模拟读数增长（在原有读数基础上增加 0.1 ~ 2.5 吨）
+      const currentReading = Number(meter.lastReading || 0);
+      const increment = Number((Math.random() * 2.4 + 0.1).toFixed(2));
+      const newReading = Number((currentReading + increment).toFixed(2));
+
+      // 4. 将新读数更新到数据库
+      await this.prisma.waterMeter.update({
+        where: { id: meterId },
+        data: {
+          lastReading: newReading,
+        },
+      });
+
+      return {
+        success: true,
+        message: '实时抄表成功',
+        data: {
+          id: meterId,
+          reading: newReading, // 最新读数
+          increment: increment, // 本次增加量
+          readAt: new Date(), // 抄表时间
+        },
+      };
+    } catch (error) {
+      console.error('实时抄表失败:', error);
+      return {
+        success: false,
+        message: error.message || '设备响应超时，抄表失败',
+      };
+    }
+  }
+
+  /**
+   * 模拟：远程控制水阀 (开阀/关阀)
+   * 请求路径: POST /api/meter/:meterId/valve
+   */
+  @Post('/:meterId/valve', { middleware: [JwtMiddleware, AdminMiddleware] })
+  async controlValve(@Body() data: { action: 'open' | 'close' }) {
+    try {
+      const meterId = this.ctx.params.meterId;
+      const { action } = data; // 前端传过来的操作指令
+
+      if (!meterId) {
+        return {
+          success: false,
+          message: '水表ID不能为空',
+        };
+      }
+
+      // 1. 查询水表
+      const meter = await this.prisma.waterMeter.findUnique({
+        where: { id: meterId },
+      });
+
+      if (!meter) {
+        return {
+          success: false,
+          message: '找不到该水表设备',
+        };
+      }
+
+      // 2. 模拟物联网设备指令下发延迟 (1.5秒左右)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // 3. (可选) 更新数据库状态
+      // 如果你的 Prisma schema 中有关于阀门状态或设备状态的字段（比如 status），可以在这里修改
+      // 假设 status 字段包含 'NORMAL' (正常开阀) 和 'MAINTENANCE' (维护关阀)
+      /*
+      await this.prisma.waterMeter.update({
+        where: { id: meterId },
+        data: {
+          status: action === 'open' ? 'NORMAL' : 'MAINTENANCE',
+        },
+      });
+      */
+
+      const actionText = action === 'open' ? '开启' : '关闭';
+
+      return {
+        success: true,
+        message: `水表阀门已成功远程${actionText}`,
+        data: {
+          id: meterId,
+          action: action,
+          executedAt: new Date(),
+        },
+      };
+    } catch (error) {
+      console.error('远程控阀失败:', error);
+      return {
+        success: false,
+        message: error.message || '指令下发失败，请重试',
+      };
+    }
+  }
 }
