@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户角色枚举
+enum Role {
+  RESIDENT
+  ADMIN
+}
+
+// 水表类型枚举 (新增)
+enum MeterType {
+  NB_IOT        // NB-IoT 智能表
+  LORA          // LoRa 远传表
+  ULTRASONIC    // 超声波大表
+  MECHANICAL    // 机械表
+}
+
+// 水表状态枚举 (扩展)
+enum MeterStatus {
+  NORMAL    // 正常 - 对应前端 online
+  FAULTY    // 故障 - 对应前端 error
+  OFFLINE   // 离线 - 对应前端 offline (新增)
+}
+
+// 阀门状态枚举 (新增)
+enum ValveStatus {
+  OPEN    // 开启
+  CLOSED  // 关闭
+  ERROR   // 异常
+}
+
+// 绑定状态枚举
+enum BindingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// 工单状态枚举
+enum TicketStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+}
+
+// 用户表
+model User {
+  id        String   @id @default(cuid())
+  openid    String   @unique
+  username  String?
+  phone     String?
+  avatar    String? // 存储 Base64 头像，映射为 Postgres TEXT
+  password  String? // 密码 (Web后台管理员登录用)
+  role      Role     @default(RESIDENT)
+  createdAt DateTime @default(now())
+
+  // 关联关系
+  meterBindings MeterBinding[]
+  repairTickets RepairTicket[]
+
+  @@map("users")
+}
+
+// 水表表 (扩展字段)
+model WaterMeter {
+  id           String        @id @default(cuid())
+  serialNumber String        @unique
+  location     String
+  lastReading  Decimal       @default(0) @db.Decimal(10, 2)
+  
+  // 新增字段
+  meterType          MeterType     @default(NB_IOT)
+  valveStatus        ValveStatus   @default(OPEN)
+  batteryLevel       Int           @default(100) // 电量百分比 0-100
+  lastCommunicationAt DateTime?    // 最后通讯时间
+  
+  status       MeterStatus @default(NORMAL)
+  createdAt    DateTime    @default(now())
+
+  // 关联关系
+  meterBindings MeterBinding[]
+  usageRecords  UsageRecord[]
+  repairTickets RepairTicket[]
+
+  @@map("water_meters")
+}
+
+// 绑定关系表
+model MeterBinding {
+  id           String        @id @default(cuid())
+  userId       String
+  meterId      String
+  status       BindingStatus @default(PENDING)
+  description  String?
+  reviewedBy   String?
+  reviewRemark String?
+  createdAt    DateTime      @default(now())
+
+  // 关联关系
+  user       User       @relation(fields: [userId], references: [id])
+  waterMeter WaterMeter @relation(fields: [meterId], references: [id])
+
+  @@map("meter_bindings")
+}
+
+// 用水记录表
+model UsageRecord {
+  id        String   @id @default(cuid())
+  meterId   String
+  period    String // 例如：2024-01
+  amount    Decimal  @db.Decimal(10, 2)
+  cost      Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  // 关联关系
+  waterMeter WaterMeter @relation(fields: [meterId], references: [id])
+
+  // 确保同一水表同一月份只有一条记录
+  @@unique([meterId, period])
+  @@map("usage_records")
+}
+
+// 报修工单表
+model RepairTicket {
+  id          String       @id @default(cuid())
+  userId      String
+  meterId     String
+  description String
+  images      Json? // 存储 Base64 或 URL 数组，映射为 Postgres JSONB
+  status      TicketStatus @default(PENDING)
+  remark      String?
+  handledBy   String?
+  createdAt   DateTime     @default(now())
+
+  // 关联关系
+  user       User       @relation(fields: [userId], references: [id])
+  waterMeter WaterMeter @relation(fields: [meterId], references: [id])
+
+  @@map("repair_tickets")
+}

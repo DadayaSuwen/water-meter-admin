@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 16 数据库服务
+  postgres:
+    image: postgres:16-alpine
+    container_name: water-meter-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: ${TZ:-Asia/Shanghai} # 同步时区
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # ⚠️ 注意：确保 ./prisma/init.sql 文件存在，否则 Docker 会创建一个名为 init.sql 的空文件夹导致报错
+      # 如果没有初始化脚本，可以注释掉下面这行
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      # 允许所有 IP 访问（包括公网）
+      - "5432:5432"
+    networks:
+      - water-meter-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # 后端 API 服务
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: water-meter-api
+    restart: unless-stopped
+    # 只需要加载 .env 文件，不需要在 environment 里一个个列出来
+    # 除非你想覆盖变量名
+    env_file:
+      - .env
+    environment:
+      # 显式传递 Prisma 需要的 URL
+      DATABASE_URL: ${DATABASE_URL}
+      # 确保容器内时区正确
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "${API_PORT:-7001}:7001"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    networks:
+      - water-meter-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 由于 Dockerfile 里已经写了 HEALTHCHECK，这里可以省略
+    # 除非你想覆盖 Dockerfile 的设置，否则删掉下面几行可以让 yaml 更清爽
+    # healthcheck: ...
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  water-meter-network:
+    driver: bridge
