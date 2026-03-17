@@ -55,9 +55,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # 由于 Dockerfile 里已经写了 HEALTHCHECK，这里可以省略
-    # 除非你想覆盖 Dockerfile 的设置，否则删掉下面几行可以让 yaml 更清爽
-    # healthcheck: ...
 
 volumes:
   postgres_data:

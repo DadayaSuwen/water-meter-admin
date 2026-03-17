@@ -2,7 +2,7 @@ const path = require('path');
 
 // 首先加载.env文件
 require('dotenv').config({
-  path: path.join(__dirname, '.env')
+  path: path.join(__dirname, '.env'),
 });
 
 // 调试输出
