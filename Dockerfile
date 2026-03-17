@@ -41,12 +41,7 @@ WORKDIR /app
 # 1. 安装运行时必需的系统库
 # Prisma 在 Alpine 下需要 openssl
 # procps 是为了让 PM2 能获取进程信息 (可选，但推荐)
-RUN apk add --no-cache openssl procps tzdata su-exec
-
-COPY entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-ENTRYPOINT ["entrypoint.sh"]
+RUN apk add --no-cache openssl procps tzdata
 
 # 2. 设置时区 (可选，建议设置为上海时间，方便看日志)
 ENV TZ="Asia/Shanghai"
